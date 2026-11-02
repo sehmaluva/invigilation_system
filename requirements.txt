@@ -1,0 +1,15 @@
+# Install PyTorch first if you want a specific CPU/GPU build (see README).
+torch
+torchvision
+ultralytics>=8.1
+lap
+fastapi
+uvicorn[standard]
+python-multipart
+sqlalchemy>=2.0
+pyyaml
+opencv-python
+itsdangerous
+imageio-ffmpeg
+numpy
+requests

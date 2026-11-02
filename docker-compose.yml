@@ -1,0 +1,8 @@
+# Optional. Running directly with Python (see README) is simpler for the phone demo.
+services:
+  invigilation:
+    build: .
+    ports: ["8000:8000"]
+    volumes:
+      - ./data:/app/data        # database, clips, thumbnails
+      - ./models:/app/models    # put best.pt here

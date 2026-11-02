@@ -1,0 +1,56 @@
+# ------------------------------------------------------------------
+# AI-Assisted Exam Invigilation Support System - settings
+# Edit this file, then restart the server.
+# ------------------------------------------------------------------
+
+server:
+  data_dir: data                 # database, clips and thumbnails go here
+  default_admin_user: admin      # created on first start - CHANGE the password
+  default_admin_password: admin123
+
+detector:                        # YOLOv8 person detector + ByteTrack
+  weights: yolov8n.pt            # downloaded automatically on first run
+  conf: 0.35
+  imgsz: 640
+  tracker: bytetrack.yaml
+  device: auto                   # auto | cpu | 0 (first GPU)
+
+pipeline:
+  process_fps: 3                 # frames analysed per second (2-5 is fine)
+  max_frame_width: 960           # frames are downscaled to this width
+  min_crop_px: 40                # ignore tiny person boxes
+
+classifier:                      # Nigel's model plugs in here
+  model_path: models/best.pt     # if missing, a STUB model is used
+  arch: resnet50                 # resnet50 | efficientnet_b0 (only for state_dict checkpoints)
+  input_size: 224                # same preprocessing as train.py (ImageNet mean/std)
+  # Class order MUST match the order the model was trained with.
+  class_names: [backwatching, frontwatching, normal, showinggestures, sidewatching, suspiciouswatching]
+  # Which classes count as "suspicious" for the binary score (agree with Nigel).
+  cheating_classes: [backwatching, showinggestures, sidewatching, suspiciouswatching]
+  batch_size: 16
+  stub:                          # STUB only: score rises when a person leans/stretches sideways
+    ref_aspect: 0.75             # normal width/height of a seated person box
+    gain: 6.0
+    noise: 0.05
+
+flagging:                        # temporal smoothing per tracked student
+  window_seconds: 3              # rolling-mean window
+  threshold: 0.6                 # smoothed score needed to raise a flag
+  min_duration_seconds: 2        # score must stay above threshold this long
+  cooldown_seconds: 20           # no new flag for the same student during this time
+  track_lost_seconds: 3          # forget a student not seen for this long
+
+clips:
+  pre_seconds: 8                 # seconds kept before the flag (ring buffer)
+  post_seconds: 3                # seconds recorded after the flag
+
+review:
+  alert_cap: 10                  # max pending flags shown at once (highest score first)
+
+retention:
+  days: 14                       # clips/thumbnails older than this are deleted
+
+stream:
+  reconnect_seconds: 3           # wait before reconnecting a dropped phone stream
+  max_reconnects: 20

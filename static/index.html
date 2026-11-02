@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Exam Invigilation Support</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:,">
+</head>
+<body>
+<header>
+  <h1>AI-Assisted Exam Invigilation Support</h1>
+  <nav id="nav" class="hidden">
+    <button data-page="live" class="active">Live</button>
+    <button data-page="review">Review queue <span id="pendingCount" class="badge">0</span></button>
+    <button data-page="stats">Stats</button>
+    <span id="who"></span>
+    <button id="logout">Log out</button>
+  </nav>
+</header>
+
+<div class="disclaimer">
+  The system only <b>flags moments for review</b>. It does not decide anything.
+  The invigilator watches the clip and makes the decision.
+</div>
+<div id="stubBanner" class="stub hidden">STUB MODEL in use - scores are not real until Nigel's best.pt is added to models/.</div>
+
+<!-- Login -->
+<section id="page-login" class="page">
+  <form id="loginForm" class="card narrow">
+    <h2>Invigilator login</h2>
+    <label>Username <input id="username" autocomplete="username" required></label>
+    <label>Password <input id="password" type="password" autocomplete="current-password" required></label>
+    <button type="submit">Log in</button>
+    <p id="loginError" class="error"></p>
+  </form>
+</section>
+
+<!-- Live -->
+<section id="page-live" class="page hidden">
+  <div class="row">
+    <div class="card grow">
+      <h2>Start a live session</h2>
+      <p class="hint">Phone (IP Webcam app): <code>http://PHONE_IP:8080/video</code> &nbsp; Laptop webcam: <code>0</code></p>
+      <div class="inline">
+        <input id="streamUrl" placeholder="http://192.168.1.5:8080/video" size="34">
+        <input id="streamName" placeholder="Session name (e.g. Room 3, 9am)" size="24">
+        <button id="startStream">Start</button>
+      </div>
+      <h2>Or analyse a recorded video</h2>
+      <div class="inline">
+        <input id="videoFile" type="file" accept="video/*">
+        <button id="uploadVideo">Upload &amp; analyse</button>
+      </div>
+      <p id="liveMsg" class="hint"></p>
+    </div>
+    <div class="card">
+      <h2>Sessions</h2>
+      <table id="jobsTable"><thead><tr><th>#</th><th>Name</th><th>Status</th><th>fps</th><th></th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+  <div class="row">
+    <div class="card grow">
+      <h2>Live view <span id="watchingLabel" class="hint"></span></h2>
+      <img id="preview" alt="Live annotated preview appears here after you start a session">
+      <p class="hint">Boxes: green = normal, orange = score above threshold, red = flagged student. Label = track ID + smoothed score.</p>
+    </div>
+    <div class="card side">
+      <h2>Incoming flags</h2>
+      <ul id="liveFlags" class="flaglist"></ul>
+    </div>
+  </div>
+</section>
+
+<!-- Review -->
+<section id="page-review" class="page hidden">
+  <div class="row">
+    <div class="card side">
+      <h2>Flagged for review</h2>
+      <p class="hint">Highest score first. Showing at most <span id="cap"></span> (alert cap).</p>
+      <select id="statusFilter">
+        <option value="pending">Pending</option><option value="confirmed">Confirmed</option>
+        <option value="dismissed">Dismissed</option><option value="all">All</option>
+      </select>
+      <ul id="queue" class="flaglist"></ul>
+    </div>
+    <div class="card grow" id="detail">
+      <p class="hint">Select a flag to review it.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Stats -->
+<section id="page-stats" class="page hidden">
+  <div class="card">
+    <h2>Statistics</h2>
+    <div id="statsGrid" class="stats"></div>
+    <h2>Sessions (processing metrics)</h2>
+    <table id="statsJobs"><thead><tr><th>#</th><th>Name</th><th>Type</th><th>Status</th><th>Frames</th>
+      <th>Footage (s)</th><th>Avg fps</th><th>Latency (ms)</th></tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<script src="app.js"></script>
+</body>
+</html>
