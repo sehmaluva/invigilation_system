@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # AI-Assisted Exam Invigilation Support System (backend + dashboard)
 
 CS/SWE 414 group project. This part covers the flag pipeline, clip export, the review dashboard, and logging of confirm/dismiss decisions.
@@ -110,3 +111,6 @@ TorchScript files, whole saved models, checkpoint dicts, and binary (1- or 2-out
 
 ## AI assistance declaration
 Parts of this code were generated with an AI assistant. The module's academic integrity policy requires you to **declare AI-assisted work** in your report and submission. Make sure you understand every part before you present it.
+=======
+# invigilation_system
+>>>>>>> 080dae21bc483575ad5257e4bd691c34ae7b7e2e
