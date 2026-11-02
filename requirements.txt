@@ -4,6 +4,7 @@ torchvision
 ultralytics>=8.1
 lap
 fastapi
+pydantic
 uvicorn[standard]
 python-multipart
 sqlalchemy>=2.0
