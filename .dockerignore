@@ -1,0 +1,10 @@
+# Dependencies are installed inside the image (see the Dockerfile).
+# Do not send a local virtualenv or old data into the build.
+.git
+.venv
+venv
+**/__pycache__
+*.pyc
+data
+**/*.pt
+**/*.mp4

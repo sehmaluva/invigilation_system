@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # AI-Assisted Exam Invigilation Support System (backend + dashboard)
 
 CS/SWE 414 group project. This part covers the flag pipeline, clip export, the review dashboard, and logging of confirm/dismiss decisions.
@@ -102,6 +101,28 @@ TorchScript files, whole saved models, checkpoint dicts, and binary (1- or 2-out
 - Wording is always "flagged for review". Track IDs are not identities.
 - Only film people who have agreed to it, for example a staged mock exam with classmates. A real exam needs permission from the department.
 
+## Docker
+
+From this folder:
+
+```
+docker compose up --build
+```
+
+Open **http://localhost:8000**. The image installs the CPU build of PyTorch, then `requirements.txt`, and starts the app with `python -m uvicorn` (the same Python that received those packages). Compose mounts only `./data` and `./models`. Those folders do not replace the libraries installed in the image.
+
+## Troubleshooting
+
+**The container exits with `ModuleNotFoundError: No module named 'sqlalchemy'`** (or another library imported by `app/`).
+
+The running image was built without the current dependencies. `docker compose up` on its own reuses that image and does not run `pip install` again. Rebuild:
+
+```
+docker compose up --build
+```
+
+The Dockerfile runs `python -c "import app.main"` before it finishes the image. If a package is missing, the build stops with that import error. Add the library to `requirements.txt` (every third-party import in `app/` is listed there) and rebuild.
+
 ## Known limitations
 - Until `best.pt` is added, scores come from a **STUB** and mean nothing.
 - Clips are recorded at the processing rate (default 3 fps), so they look choppy.
@@ -111,6 +132,3 @@ TorchScript files, whole saved models, checkpoint dicts, and binary (1- or 2-out
 
 ## AI assistance declaration
 Parts of this code were generated with an AI assistant. The module's academic integrity policy requires you to **declare AI-assisted work** in your report and submission. Make sure you understand every part before you present it.
-=======
-# invigilation_system
->>>>>>> 080dae21bc483575ad5257e4bd691c34ae7b7e2e
