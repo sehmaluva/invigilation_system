@@ -153,6 +153,3 @@ The Dockerfile runs `python -c "import app.main"` before it finishes the image. 
 - If a student leaves the frame and comes back, they may get a new track ID.
 - Camera angle and distance matter: the datasets are close-up classroom shots.
 - Detection is CPU-friendly (about 30–150 ms per frame on a laptop), but larger halls with many people get slower.
-
-## AI assistance declaration
-Parts of this code were generated with an AI assistant. The module's academic integrity policy requires you to **declare AI-assisted work** in your report and submission. Make sure you understand every part before you present it.
