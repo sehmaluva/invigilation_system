@@ -242,5 +242,72 @@ class CheckpointTests(unittest.TestCase):
         self.assertEqual(full.snapshot()["flags"][0]["id"], 9)
 
 
+class PlaybackTests(unittest.TestCase):
+    def test_infer_clock_drops_stale_frames(self):
+        from app.pipeline import InferClock
+        clock = InferClock(3)                     # one sample about every 0.333 s
+        self.assertTrue(clock.due(1, 0.0))
+        clock.mark(1, 0.0)
+        self.assertFalse(clock.due(1, 0.0))
+        self.assertFalse(clock.due(2, 0.2))
+        self.assertTrue(clock.due(8, 1.0))         # inference was slow: take the newest
+        clock.mark(8, 1.0)
+        self.assertFalse(clock.due(9, 1.1))
+        self.assertTrue(clock.due(10, 1.34))
+
+    def test_overlay_moves_then_hides(self):
+        from app.pipeline import OverlayTracks
+        tracks = OverlayTracks(1.0)
+        tracks.update([(1, [0, 0, 10, 20], 0.2)], 0.0)
+        tracks.update([(1, [10, 0, 20, 20], 0.9)], 1.0)
+        shown = tracks.visible(1.5)
+        self.assertEqual(len(shown), 1)
+        tid, box, score, fade, det_t = shown[0]
+        self.assertEqual(tid, 1)
+        self.assertAlmostEqual(det_t, 1.0)
+        self.assertAlmostEqual(score, 0.9)
+        self.assertAlmostEqual(box[0], 15.0, places=2)   # velocity 10 px/s for 0.5 s
+        self.assertGreater(fade, 0.4)
+        self.assertEqual(tracks.visible(2.2), [])
+
+    def test_realtime_file_playback_matches_duration(self):
+        import shutil
+        import tempfile
+        import threading
+        import time
+        import cv2
+        from app.pipeline import FileSource
+        folder = Path(tempfile.mkdtemp())
+        path = folder / "pace.mp4"
+        fps, n = 20, 30                               # 1.5 s
+        writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (64, 48))
+        frame = np.zeros((48, 64, 3), np.uint8)
+        for i in range(n):
+            frame[:] = (i * 3) % 255
+            writer.write(frame)
+        writer.release()
+        stop = threading.Event()
+        started = time.monotonic()
+        src = FileSource(str(path), realtime=True, stop_event=stop)
+        try:
+            seen = set()
+            deadline = started + 4
+            while time.monotonic() < deadline and not src.slot.is_done():
+                snap = src.slot.snapshot()
+                if snap:
+                    seen.add(snap[0])
+                time.sleep(0.02)
+            # The reader marks done after the last frame is published.
+            while time.monotonic() < deadline and not src.slot.is_done():
+                time.sleep(0.02)
+            elapsed = time.monotonic() - started
+        finally:
+            src.close()
+            shutil.rmtree(folder, ignore_errors=True)
+        self.assertGreater(len(seen), 15)
+        self.assertGreater(elapsed, 1.2)
+        self.assertLess(elapsed, 2.6)
+
+
 if __name__ == "__main__":
     unittest.main()
