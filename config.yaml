@@ -17,7 +17,13 @@ detector:                        # YOLOv8 person detector + ByteTrack
 
 pipeline:
   process_fps: 3                 # frames analysed per second (notebook TRY_FPS)
-  max_frame_width: 0             # 0 = do not downscale (matches Try-it). Set 960 to go faster.
+  max_frame_width: 0             # inference only. 0 = full frame (matches Try-it)
+  preview_max_width: 960         # JPEG preview only; inference stays full resolution
+  preview_jpeg_quality: 60
+  preview_max_fps: 30            # cap on how often the preview is re-encoded
+  realtime: true                 # files play at 1x. false = analyse sampled frames as fast as possible
+  overlay_fresh_seconds: 1.0    # hide boxes that are older than this on the live picture
+  torch_threads: 2               # keep CPU inference from starving the preview
   min_crop_px: 40                # ignore tiny person boxes
 
 classifier:                      # notebook best.pt plugs in here

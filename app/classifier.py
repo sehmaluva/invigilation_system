@@ -13,6 +13,7 @@ The cheating score is the sum of the columns named in cheating_classes (softmax 
 notebook's 2-way cross-entropy head; sigmoid only for a single-logit head).
 """
 import json
+import os
 import threading
 import warnings
 
@@ -27,6 +28,29 @@ from .config import CFG, resolve
 C = CFG["classifier"]
 F = CFG["flagging"]
 IMAGENET_MEAN, IMAGENET_STD = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+
+
+def configure_compute_threads():
+    """One small torch pool. A decode thread plus an all-core BLAS call stalls the preview."""
+    n = max(1, int(CFG["pipeline"].get("torch_threads", 2)))
+    for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+        os.environ.setdefault(var, str(n))
+    try:
+        torch.set_num_threads(n)
+    except Exception:
+        pass
+    try:
+        torch.set_num_interop_threads(1)
+    except Exception:
+        pass
+    try:
+        import cv2
+        cv2.setNumThreads(1)
+    except Exception:
+        pass
+
+
+configure_compute_threads()
 
 
 def pick_device():

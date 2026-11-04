@@ -52,6 +52,7 @@
       <div class="inline">
         <input id="videoFile" type="file" accept="video/*">
         <button id="uploadVideo">Upload &amp; analyse</button>
+        <label class="hint"><input id="realtime" type="checkbox" checked> Play at real time</label>
       </div>
       <p id="liveMsg" class="hint"></p>
     </div>
@@ -64,7 +65,8 @@
     <div class="card grow">
       <h2>Live view <span id="watchingLabel" class="hint"></span></h2>
       <img id="preview" alt="Live annotated preview appears here after you start a session">
-      <p class="hint">Boxes: green = normal, orange = score above threshold, red = flagged student. Label = track ID + smoothed score.</p>
+      <p id="previewStats" class="hint">Display — fps · Inference — fps · Latency — ms</p>
+      <p class="hint">Boxes follow the picture and fade out about a second after their detection. The time on each box is when that score was measured. Green = below threshold, orange = above it, red = flagged.</p>
     </div>
     <div class="card side">
       <h2>Incoming flags</h2>

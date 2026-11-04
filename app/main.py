@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import (Depends, FastAPI, File, HTTPException, Request, UploadFile,
+from fastapi import (Depends, FastAPI, File, Form, HTTPException, Request, UploadFile,
                      WebSocket, WebSocketDisconnect)
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -73,7 +73,13 @@ def create_user(body: UserIn, admin: User = Depends(admin_user)):
 
 
 # ------------------------------------------------------------------ sources & jobs
-def _new_job(kind, uri, name, user):
+def _as_bool(value, default):
+    if value is None or value == "":
+        return default
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _new_job(kind, uri, name, user, realtime=None):
     with SessionLocal() as db:
         src = Source(kind=kind, uri=uri, name=name)
         db.add(src)
@@ -83,17 +89,23 @@ def _new_job(kind, uri, name, user):
         db.commit()
         audit(db, user.id, f"start_{kind}", f"job {job.id}", name)
         job_id = job.id
-    manager.start(job_id, kind, uri)
+    manager.start(job_id, kind, uri, realtime=realtime)
     return {"job_id": job_id, "source_id": src.id}
 
 
 @app.post("/videos")
-def upload_video(file: UploadFile = File(...), user: User = Depends(current_user)):
-    """Upload a recorded exam video; it is processed in the background."""
+def upload_video(file: UploadFile = File(...), realtime: str = Form(None),
+                 user: User = Depends(current_user)):
+    """Upload a recorded exam video; it is processed in the background.
+
+    realtime=true (the default) plays the preview at 1x. realtime=false analyses
+    sampled frames as fast as the CPU allows, for evaluation.
+    """
     dest = UPLOAD_DIR / f"{int(time.time())}_{Path(file.filename).name}"
     with open(dest, "wb") as f:
         shutil.copyfileobj(file.file, f)
-    return _new_job("file", str(dest), file.filename, user)
+    use_rt = _as_bool(realtime, CFG["pipeline"].get("realtime", True))
+    return _new_job("file", str(dest), file.filename, user, realtime=use_rt)
 
 
 class StreamIn(BaseModel):
@@ -116,7 +128,7 @@ def stop_stream(job_id: int, user: User = Depends(current_user)):
 
 
 def job_dict(job, src):
-    return {"id": job.id, "status": job.status, "kind": src.kind, "name": src.name,
+    info = {"id": job.id, "status": job.status, "kind": src.kind, "name": src.name,
             "created_at": job.created_at.isoformat() + "Z",
             "started_at": job.started_at.isoformat() + "Z" if job.started_at else None,
             "finished_at": job.finished_at.isoformat() + "Z" if job.finished_at else None,
@@ -124,6 +136,10 @@ def job_dict(job, src):
             "proc_seconds": round(job.proc_seconds or 0, 1), "avg_fps": round(job.avg_fps or 0, 2),
             "avg_latency_ms": round(job.avg_latency_ms or 0, 1), "error": job.error,
             "live": manager.is_alive(job.id)}
+    stats = manager.stats(job.id)
+    if stats:
+        info.update(stats)
+    return info
 
 
 @app.get("/jobs")
@@ -154,7 +170,7 @@ async def preview(job_id: int, user: User = Depends(current_user)):
                 yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
             if not manager.is_alive(job_id) and frame is last:
                 break
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.02)
     return StreamingResponse(gen(), media_type="multipart/x-mixed-replace; boundary=frame")
 
 

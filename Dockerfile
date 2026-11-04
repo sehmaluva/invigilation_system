@@ -13,5 +13,8 @@ COPY . .
 RUN python -c "import app.main"
 EXPOSE 8000
 # So the startup model/threshold log shows up immediately in `docker logs`.
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1 \
+    OMP_NUM_THREADS=2 \
+    MKL_NUM_THREADS=2 \
+    OPENBLAS_NUM_THREADS=2
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
