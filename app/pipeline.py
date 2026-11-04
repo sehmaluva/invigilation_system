@@ -4,31 +4,23 @@ One pipeline for both recorded files and live streams:
   frame -> YOLOv8 person detection + ByteTrack IDs -> crop each student
         -> classifier.predict(crops) -> cheat score -> rolling mean per track
         -> flag events -> DB + thumbnail + clip + WebSocket push
+        -> per-track score series (live chart + GET /jobs/{id}/scores)
 """
+import json
 import threading
 import time
 
 import cv2
 import numpy as np
 
-from .classifier import Classifier, cheat_score, pick_device, top_class
+from .classifier import get_classifier, pick_device
 from .clips import ClipRecorder, draw
-from .config import CFG
+from .config import CFG, SERIES_DIR
 from .db import Flag, Job, SessionLocal, now
-from .flagging import FlagEngine, zone_of
+from .flagging import FlagEngine, TrackHistory, zone_of
 
 P = CFG["pipeline"]
-_classifier = None
-_clf_lock = threading.Lock()
-
-
-def get_classifier():
-    """Classifier is shared by all jobs (loaded once)."""
-    global _classifier
-    with _clf_lock:
-        if _classifier is None:
-            _classifier = Classifier()
-    return _classifier
+CROP_PAD = float(CFG["classifier"].get("crop_pad", 0) or 0)
 
 
 # ------------------------------------------------------------------ sources
@@ -127,7 +119,9 @@ class Pipeline(threading.Thread):
         self.stop_event = threading.Event()
         self.preview = None                   # latest annotated JPEG (bytes)
         self.engine = FlagEngine()
+        self.history = None                   # TrackHistory, created once the model is loaded
         self.recorder = ClipRecorder(P["process_fps"])
+        self._frames_seen = 0
 
     def stop(self):
         self.stop_event.set()
@@ -149,6 +143,14 @@ class Pipeline(threading.Thread):
         try:
             yolo = YOLO(D["weights"])
             clf = get_classifier()
+            self.engine.threshold = clf.threshold
+            self.recorder.threshold = clf.threshold
+            # Live view keeps a short window; a recorded file keeps every point.
+            self.history = TrackHistory(
+                bounded=self.kind == "stream",
+                max_seconds=CFG["flagging"].get("score_history_seconds", 180),
+                threshold=clf.threshold,
+            )
             device = pick_device()
             source = StreamSource(self.uri) if self.kind == "stream" else FileSource(self.uri)
             n, busy, t_last, t_start = 0, 0.0, 0.0, time.monotonic()
@@ -185,14 +187,16 @@ class Pipeline(threading.Thread):
             print(f"[pipeline] job {self.job_id} error: {e}")
             self._update_job(status="error", error=str(e), finished_at=now())
         finally:
+            self._write_series()
             if source:
                 source.close()
         self.notify({"type": "job", "job_id": self.job_id, "status": status})
 
     def _process(self, t, frame, yolo, clf, device, D):
-        # 1) resize for speed
-        if frame.shape[1] > P["max_frame_width"]:
-            s = P["max_frame_width"] / frame.shape[1]
+        # 1) optional downscale (0 = off, which matches the notebook Try-it path)
+        max_w = int(P.get("max_frame_width") or 0)
+        if max_w > 0 and frame.shape[1] > max_w:
+            s = max_w / frame.shape[1]
             frame = cv2.resize(frame, None, fx=s, fy=s)
         h, w = frame.shape[:2]
 
@@ -206,17 +210,26 @@ class Pipeline(threading.Thread):
                     boxes.append(b)
                     ids.append(tid)
 
-        # 3) classify crops in one batch
-        crops = [frame[int(y1):int(y2), int(x1):int(x2)] for x1, y1, x2, y2 in boxes]
+        # 3) classify crops in one batch (tight box when crop_pad is 0, like Try-it)
+        crops, keep_boxes, keep_ids = [], [], []
+        for box, tid in zip(boxes, ids):
+            crop = cut_crop(frame, box, CROP_PAD)
+            if crop is None:
+                continue
+            crops.append(crop)
+            keep_boxes.append(box)
+            keep_ids.append(tid)
         probs = clf.predict(crops)
-        scores = cheat_score(probs) if len(crops) else np.zeros(0)
+        scores = clf.cheat_score(probs) if len(crops) else np.zeros(0)
 
-        # 4) smoothing + flag rules
+        # 4) smoothing + flag rules, and the per-track series for the chart
         dets, events = [], []
-        for tid, box, sc, pr in zip(ids, boxes, scores, probs):
+        for tid, box, sc, pr in zip(keep_ids, keep_boxes, scores, probs):
             extra = {"zone": zone_of(box, w, h),
-                     "top_class": "stub" if clf.is_stub else top_class(pr)}
+                     "top_class": "stub" if clf.is_stub else clf.top_class(pr)}
             smooth, ev = self.engine.update(t, tid, float(sc), extra)
+            if self.history is not None:
+                self.history.add(tid, t, float(sc), smooth)
             dets.append((tid, box.tolist(), smooth))
             events += ev
         events += self.engine.expire(t)
@@ -225,9 +238,15 @@ class Pipeline(threading.Thread):
         self.recorder.add(t, frame, dets)
         for ev in events:
             self._on_event(ev)
+        self._sync_open_flags()
+        self._frames_seen += 1
+        if self._frames_seen % 15 == 0:
+            self._write_series()
+        self._publish_scores(t)
 
         # 6) annotated live preview
-        img = draw(frame, dets)
+        active = {tid for tid, st in self.engine.tracks.items() if st.active_flag}
+        img = draw(frame, dets, threshold=clf.threshold, active=active)
         label = "STUB MODEL - scores not real" if clf.is_stub else "Flags are for review only"
         cv2.putText(img, f"t={t:6.1f}s  people={len(dets)}  {label}", (8, h - 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
@@ -239,7 +258,9 @@ class Pipeline(threading.Thread):
             with SessionLocal() as db:
                 flag = Flag(job_id=self.job_id, track_id=fl["track_id"], start_s=fl["start_s"],
                             end_s=fl["end_s"], peak_score=fl["peak"], mean_score=fl["peak"],
-                            zone=fl["zone"], top_class=fl["top_class"], status="pending")
+                            zone=fl["zone"], top_class=fl["top_class"], status="pending",
+                            threshold=self.engine.threshold,
+                            score_series=json.dumps(self._series_for(fl)))
                 db.add(flag)
                 db.commit()
                 fl["db_id"] = flag.id
@@ -247,20 +268,98 @@ class Pipeline(threading.Thread):
                                                       self._clip_saved)
                 db.commit()
                 self.notify({"type": "flag_new", "flag": flag_dict(flag)})
+            if self.history is not None:
+                self.history.upsert_flag(fl["db_id"], fl["track_id"], fl["start_s"], fl["end_s"])
         elif kind == "close" and "db_id" in fl:
             with SessionLocal() as db:
                 flag = db.get(Flag, fl["db_id"])
                 flag.end_s, flag.peak_score = fl["end_s"], fl["peak"]
                 flag.mean_score = fl["sum"] / fl["n"]
+                flag.score_series = json.dumps(self._series_for(fl))
                 db.commit()
                 self.notify({"type": "flag_update", "flag": flag_dict(flag)})
+            if self.history is not None:
+                self.history.upsert_flag(fl["db_id"], fl["track_id"], fl["start_s"], fl["end_s"])
 
     def _clip_saved(self, flag_id, path):
         with SessionLocal() as db:
             flag = db.get(Flag, flag_id)
             flag.clip_path = path
+            if self.history is not None:
+                flag.score_series = json.dumps(
+                    self.history.window(flag.track_id, flag.start_s - 10, flag.end_s + 4))
             db.commit()
             self.notify({"type": "flag_update", "flag": flag_dict(flag)})
+
+    def _series_for(self, fl):
+        if self.history is None:
+            return []
+        return self.history.window(fl["track_id"], fl["start_s"] - 10, fl["end_s"] + 4)
+
+    def _sync_open_flags(self):
+        if self.history is None:
+            return
+        for tid, st in self.engine.tracks.items():
+            fl = st.active_flag
+            if fl and fl.get("db_id"):
+                self.history.upsert_flag(fl["db_id"], tid, fl["start_s"], fl["end_s"])
+
+    def _publish_scores(self, t):
+        if self.history is None:
+            return
+        snap = self.history.snapshot()
+        t_key = round(float(t), 3)
+        points = []
+        for tr in snap["tracks"]:
+            if not tr["points"]:
+                continue
+            last = tr["points"][-1]
+            if last["t"] == t_key:
+                points.append({"track_id": tr["track_id"], "t": last["t"],
+                               "raw": last["raw"], "smooth": last["smooth"]})
+        self.notify({
+            "type": "scores", "job_id": self.job_id, "t": t_key,
+            "threshold": snap["threshold"], "bounded": snap["bounded"],
+            "history_seconds": snap["history_seconds"],
+            "points": points, "flags": snap["flags"],
+        })
+
+    def _write_series(self):
+        if self.history is None:
+            return
+        try:
+            snap = self.score_snapshot()
+            path = SERIES_DIR / f"{self.job_id}.json"
+            tmp = path.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(snap))
+            tmp.replace(path)
+        except Exception as e:
+            print(f"[pipeline] could not save score series for job {self.job_id}: {e}")
+
+    def score_snapshot(self):
+        if self.history is None:
+            return None
+        snap = self.history.snapshot()
+        snap["job_id"] = self.job_id
+        snap["kind"] = self.kind
+        return snap
+
+
+def cut_crop(frame, box, pad):
+    """Slice a person box the way the notebook Try-it video does (int bounds, optional pad)."""
+    h, w = frame.shape[:2]
+    x1, y1, x2, y2 = [float(v) for v in box]
+    if pad:
+        px, py = pad * (x2 - x1), pad * (y2 - y1)
+        x1, y1, x2, y2 = x1 - px, y1 - py, x2 + px, y2 + py
+    x1, y1 = max(0, int(x1)), max(0, int(y1))
+    x2, y2 = min(w, int(x2)), min(h, int(y2))
+    if x2 <= x1 or y2 <= y1:
+        return None
+    crop = frame[y1:y2, x1:x2]
+    if crop.size == 0 or crop.ndim != 3 or crop.shape[2] < 3:
+        return None
+    return crop
 
 
 def flag_dict(f):

@@ -68,6 +68,8 @@ class Flag(Base):
     zone = Column(String(10))                                 # 3x3 grid, e.g. "B2"
     clip_path = Column(Text)
     thumb_path = Column(Text)
+    threshold = Column(Float)                                 # threshold in use when the flag opened
+    score_series = Column(Text)                               # JSON [[t, smoothed], ...] around the flag
     status = Column(String(20), default="pending")            # pending|confirmed|dismissed
     created_at = Column(DateTime, default=now)
     first_opened_at = Column(DateTime)                        # when an invigilator first opened it
@@ -96,6 +98,13 @@ class AuditLog(Base):
 
 def init_db():
     Base.metadata.create_all(engine)
+    # Existing SQLite files predate score_series / threshold. create_all does not add columns.
+    with engine.begin() as conn:
+        have = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(flags)")}
+        if "threshold" not in have:
+            conn.exec_driver_sql("ALTER TABLE flags ADD COLUMN threshold FLOAT")
+        if "score_series" not in have:
+            conn.exec_driver_sql("ALTER TABLE flags ADD COLUMN score_series TEXT")
 
 
 def audit(db, user_id, action, target="", detail=""):

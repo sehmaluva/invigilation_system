@@ -10,36 +10,41 @@ server:
 
 detector:                        # YOLOv8 person detector + ByteTrack
   weights: yolov8n.pt            # downloaded automatically on first run
-  conf: 0.35
+  conf: 0.30                     # notebook YOLO_CONF (Try-it video uses 0.3)
   imgsz: 640
   tracker: bytetrack.yaml
   device: auto                   # auto | cpu | 0 (first GPU)
 
 pipeline:
-  process_fps: 3                 # frames analysed per second (2-5 is fine)
-  max_frame_width: 960           # frames are downscaled to this width
+  process_fps: 3                 # frames analysed per second (notebook TRY_FPS)
+  max_frame_width: 0             # 0 = do not downscale (matches Try-it). Set 960 to go faster.
   min_crop_px: 40                # ignore tiny person boxes
 
-classifier:                      # Nigel's model plugs in here
+classifier:                      # notebook best.pt plugs in here
   model_path: models/best.pt     # if missing, a STUB model is used
-  arch: resnet50                 # resnet50 | efficientnet_b0 (only for state_dict checkpoints)
-  input_size: 224                # same preprocessing as train.py (ImageNet mean/std)
-  # Class order MUST match the order the model was trained with.
-  class_names: [backwatching, frontwatching, normal, showinggestures, sidewatching, suspiciouswatching]
-  # Which classes count as "suspicious" for the binary score (agree with Nigel).
-  cheating_classes: [backwatching, showinggestures, sidewatching, suspiciouswatching]
+  arch: efficientnet_b0          # used only when the checkpoint does not say arch
+  input_size: 224                # overridden by the checkpoint when it stores input_size
+  crop_pad: 0.0                  # Try-it scores the tight box. Training crops used 0.10.
+  # Fallback only. A checkpoint's class_names / cheating_classes replace these,
+  # so the cheating column is the one the notebook trained (index of "cheating").
+  class_names: [normal, cheating]
+  cheating_classes: [cheating]
   batch_size: 16
   stub:                          # STUB only: score rises when a person leans/stretches sideways
     ref_aspect: 0.75             # normal width/height of a seated person box
     gain: 6.0
     noise: 0.05
 
-flagging:                        # temporal smoothing per tracked student
-  window_seconds: 3              # rolling-mean window
-  threshold: 0.6                 # smoothed score needed to raise a flag
-  min_duration_seconds: 2        # score must stay above threshold this long
-  cooldown_seconds: 20           # no new flag for the same student during this time
+flagging:                        # temporal smoothing per tracked student (notebook Try-it)
+  window_seconds: 3              # rolling-mean window (WINDOW_S)
+  # Used when best.pt / metrics.json has no threshold. The notebook's tuned
+  # threshold stored in the checkpoint is used instead when use_checkpoint_threshold is true.
+  threshold: 0.5
+  use_checkpoint_threshold: true
+  min_duration_seconds: 2        # score must stay above threshold this long (MIN_DURATION_S)
+  cooldown_seconds: 20           # no new flag for the same student during this time (COOLDOWN_S)
   track_lost_seconds: 3          # forget a student not seen for this long
+  score_history_seconds: 180     # live chart: how much history to keep per track
 
 clips:
   pre_seconds: 8                 # seconds kept before the flag (ring buffer)
