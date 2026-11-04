@@ -13,21 +13,38 @@ except ImportError:
 
 
 def draw(frame, dets, highlight=None, threshold=None, active=None):
-    """Draw person boxes. dets: list of (track_id, bbox, smoothed_score).
+    """Draw person boxes.
 
-    Red = flagged student, orange = smoothed score at or above the threshold
-    actually in use, green = below it.
+    Each det is (track_id, bbox, smoothed_score) or
+    (track_id, bbox, score, fade, det_time). fade is 1 when the detection
+    matches this frame and falls toward 0 as it gets older. The optional
+    det_time is the frame the score was measured on, in the same clock as the video.
+    Red = flagged student, orange = score at or above the threshold, green = below it.
     """
     thr = CFG["flagging"]["threshold"] if threshold is None else threshold
     active = set(active or ())
     if highlight is not None:
         active.add(highlight)
     img = frame.copy()
-    for tid, (x1, y1, x2, y2), s in dets:
+    for item in dets:
+        fade, det_t = 1.0, None
+        if len(item) >= 5:
+            tid, (x1, y1, x2, y2), s, fade, det_t = item[:5]
+        elif len(item) == 4:
+            tid, (x1, y1, x2, y2), s, fade = item
+        else:
+            tid, (x1, y1, x2, y2), s = item
+        fade = max(0.0, min(1.0, float(fade)))
         hot = tid in active
-        color = (0, 0, 255) if hot else (0, 165, 255) if s >= thr else (80, 200, 80)
-        cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), color, 3 if hot else 2)
-        cv2.putText(img, f"ID {tid}  {s:.2f}", (int(x1), max(int(y1) - 6, 12)),
+        base = (0, 0, 255) if hot else (0, 165, 255) if s >= thr else (80, 200, 80)
+        gain = 0.25 + 0.75 * fade
+        color = tuple(int(c * gain) for c in base)
+        thick = 3 if hot else 2
+        cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), color, thick)
+        label = f"ID {tid}  {s:.2f}"
+        if det_t is not None:
+            label += f"  {det_t:.1f}s"
+        cv2.putText(img, label, (int(x1), max(int(y1) - 6, 12)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
     return img
 

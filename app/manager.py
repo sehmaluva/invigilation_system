@@ -12,8 +12,8 @@ class Manager:
         self.clients = set()          # open WebSockets
         self.loop = None              # FastAPI event loop (set on startup)
 
-    def start(self, job_id, kind, uri):
-        p = Pipeline(job_id, kind, uri, self.notify)
+    def start(self, job_id, kind, uri, realtime=None):
+        p = Pipeline(job_id, kind, uri, self.notify, realtime=realtime)
         self.pipelines[job_id] = p
         p.start()
         return p
@@ -31,6 +31,10 @@ class Manager:
     def is_alive(self, job_id):
         p = self.pipelines.get(job_id)
         return bool(p and p.is_alive())
+
+    def stats(self, job_id):
+        p = self.pipelines.get(job_id)
+        return p.stats() if p else None
 
     def scores(self, job_id):
         """In-memory series while the job is loaded, otherwise the file written at the end."""

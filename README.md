@@ -62,7 +62,7 @@ On the first session the detector `yolov8n.pt` (6 MB) downloads automatically, s
 4. In the dashboard, open **Live** and paste **`http://192.168.1.5:8080/video`** (add `/video`), then click **Start**.
    - DroidCam: `http://PHONE_IP:4747/video`
    - Laptop webcam: type `0`
-5. You see the live view with boxes, student IDs, and scores. Flags appear on the right and in **Review queue**.
+5. You see the live view with boxes, student IDs, and scores. Flags appear on the right and in **Review queue**. The line under the picture shows display fps, inference fps, and the capture-to-display latency. The reader keeps only the newest camera frame, so a slow detector does not build up a delay. Boxes are slid forward from their last detection and hidden after about a second, and the time printed on a box is the same timestamp the score chart uses.
 
 Tips: put the phone on a stand, landscape, about 2–4 m from 3–6 people. In IP Webcam, set the video resolution to 640x480 or 1280x720. If it won't connect, open the URL in the laptop's browser first. If it doesn't load there, it's a Wi-Fi or firewall problem; university Wi-Fi often blocks device-to-device traffic, so use a hotspot.
 
@@ -99,7 +99,8 @@ Preprocessing of each crop is BGR to RGB, divide by 255, resize to 224, ImageNet
 The Live page draws one line per tracked student (smoothed cheating score), the threshold as a dashed line, and shaded bands for flagged periods. Points arrive on the WebSocket. A live session keeps the last `flagging.score_history_seconds` (180) on the server and in the browser. Opening a flag in **Review queue** shows that student's scores around the flag. For a recorded video, the full series is `GET /jobs/{id}/scores`.
 
 ## 6. Recorded video and evaluation
-- Dashboard: **Live → Upload & analyse**. Or with the API: `POST /videos`.
+- Dashboard: **Live → Upload & analyse**. **Play at real time** is on by default, so the preview runs at the file's own fps while detection stays at `process_fps` (about 3). Uncheck it, or post `realtime=false`, to score the file as fast as the CPU can. Flag times and the chart are seconds into the video either way.
+- Or with the API: `POST /videos` (optional form field `realtime=true|false`).
 - Build a test video with known "cheating" times from a dataset folder that has class subfolders:
   ```
   python scripts/make_synthetic_video.py --images PATH/TO/examdatasetnew/test --out data/synthetic.mp4 --gt data/synthetic_gt.csv
@@ -147,7 +148,8 @@ The Dockerfile runs `python -c "import app.main"` before it finishes the image. 
 
 ## Known limitations
 - Until `best.pt` is added, scores come from a **STUB** and mean nothing.
-- Clips are recorded at the processing rate (default 3 fps), so they look choppy.
+- The live preview plays at the camera or file rate. Clips are still recorded at the processing rate (default 3 fps), so they look choppy.
+- Boxes older than `overlay_fresh_seconds` (1 s) are hidden rather than left sitting where the person used to be.
 - If a student leaves the frame and comes back, they may get a new track ID.
 - Camera angle and distance matter: the datasets are close-up classroom shots.
 - Detection is CPU-friendly (about 30–150 ms per frame on a laptop), but larger halls with many people get slower.

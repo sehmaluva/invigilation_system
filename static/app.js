@@ -66,7 +66,9 @@ $("startStream").onclick = async () => {
 $("uploadVideo").onclick = async () => {
   const f = $("videoFile").files[0];
   if (!f) return ($("liveMsg").textContent = "Choose a video file first.");
-  const fd = new FormData(); fd.append("file", f);
+  const fd = new FormData();
+  fd.append("file", f);
+  fd.append("realtime", $("realtime").checked ? "true" : "false");
   $("liveMsg").textContent = "Uploading...";
   try {
     const r = await api("/videos", { method: "POST", body: fd });
@@ -124,6 +126,8 @@ function connectWs() {
       if (msg.job_id !== chartJob) return;
       if (!chartReady) chartQueue.push(msg);
       else applyLiveScores(msg);
+    } else if (msg.type === "sync") {
+      applySync(msg);
     } else if (msg.type === "job") loadJobs();
   };
   ws.onclose = () => token && setTimeout(connectWs, 3000);     // auto-reconnect
@@ -265,6 +269,18 @@ const thresholdShadePlugin = {
         ctx.fillText(label, Math.max(area.left + 4, area.right - tw - 8), Math.max(area.top + 14, y - 6));
       }
     }
+    if (chart.$now != null && xScale) {
+      const x = xScale.getPixelForValue(chart.$now);
+      if (x >= area.left && x <= area.right) {
+        ctx.strokeStyle = "#1f3a5f";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(x, area.top);
+        ctx.lineTo(x, area.bottom);
+        ctx.stroke();
+      }
+    }
     ctx.restore();
   },
 };
@@ -356,6 +372,21 @@ function paintChart(chart, payload, replace) {
 function applyLiveScores(msg) {
   if (!scoreChart || msg.job_id !== chartJob) return;
   paintChart(scoreChart, msg, false);
+}
+
+function applySync(msg) {
+  if (msg.job_id !== watchingJob && msg.job_id !== chartJob) return;
+  const lat = msg.latency_ms == null ? "-" : Math.round(msg.latency_ms);
+  const age = msg.det_age_ms == null ? "-" : (msg.det_age_ms / 1000).toFixed(1);
+  const el = $("previewStats");
+  if (el) {
+    el.textContent = "Display " + Number(msg.display_fps).toFixed(1) + " fps · Inference " +
+      Number(msg.infer_fps).toFixed(1) + " fps · Latency " + lat + " ms · Scores " + age + "s behind the picture";
+  }
+  if (scoreChart && msg.frame_t != null && msg.job_id === chartJob) {
+    scoreChart.$now = msg.frame_t;
+    scoreChart.update("none");
+  }
 }
 
 async function loadScoreChart(jobId) {
