@@ -16,7 +16,7 @@ camera / video -> YOLOv8n person detection + ByteTrack IDs -> crop each student
 |---|---|
 | `app/main.py` | FastAPI: API endpoints, WebSocket `/ws`, live preview, dashboard |
 | `app/pipeline.py` | One pipeline for files **and** live streams (reconnects if the phone drops) |
-| `app/classifier.py` | `predict(crops) -> probs`; loads `models/best.pt`, otherwise a STUB |
+| `app/classifier.py` | `predict(crops) -> probs`; loads `models/best.pt` (class list, cheating index, threshold), otherwise a STUB |
 | `app/flagging.py` | Temporal smoothing, flag rules, 3x3 hall zones (A1..C3) |
 | `app/clips.py` | Ring buffer, clip (H.264 mp4) and thumbnail export |
 | `app/db.py` | SQLite tables: users, sources, jobs, flags, reviews, audit_log |
@@ -66,17 +66,39 @@ On the first session the detector `yolov8n.pt` (6 MB) downloads automatically, s
 
 Tips: put the phone on a stand, landscape, about 2–4 m from 3–6 people. In IP Webcam, set the video resolution to 640x480 or 1280x720. If it won't connect, open the URL in the laptop's browser first. If it doesn't load there, it's a Wi-Fi or firewall problem; university Wi-Fi often blocks device-to-device traffic, so use a hotspot.
 
-**While the STUB model is in use** (no `best.pt`): a student's score rises when their box gets wider, for example when they lean sideways or stretch an arm out. Hold that for about 3 seconds to trigger a test flag. Tune `classifier.stub` or `flagging.threshold` in `config.yaml`.
+**While the STUB model is in use** (no `best.pt`): a student's score rises when their box gets wider, for example when they lean sideways or stretch an arm out. Hold that for about 2 seconds above the threshold to trigger a test flag. Tune `classifier.stub` or `flagging.threshold` in `config.yaml`.
 
-## 4. Add Nigel's model
-Copy his file to **`models/best.pt`** and restart. In `config.yaml`:
-- `class_names`: the **same order** as in his training (check his train.py or metrics.json).
-- `cheating_classes`: which classes count as suspicious.
-- `arch`: `resnet50` or `efficientnet_b0` (only needed if best.pt is a state_dict).
+## 4. Load the notebook's best.pt
+The Colab notebook `models/Exam_Cheating_TPU_Training.ipynb` trains EfficientNet-B0 with two classes, `["normal", "cheating"]`, and saves `best.pt` plus `metrics.json`. The checkpoint holds the architecture, the class list, and the precision-tuned threshold. The Try-it video section flags with that threshold.
 
-TorchScript files, whole saved models, checkpoint dicts, and binary (1- or 2-output) models are all accepted. Preprocessing is 224x224 with ImageNet mean/std, the same as train.py.
+1. Copy `best.pt` to **`models/best.pt`**. If you have `metrics.json`, put it in `models/` as well (used only when the checkpoint itself has no `threshold`).
+2. Restart (`docker compose up --build`, or uvicorn).
+3. Read the startup log. It prints the model path, arch, class list, **cheating output index**, activation, and the threshold with its source (`checkpoint`, `metrics.json`, or `config`).
 
-## 5. Recorded video and evaluation
+`config.yaml` defaults match that Try-it path:
+
+| Setting | Default | Notebook |
+|---|---|---|
+| `classifier.arch` | `efficientnet_b0` | `ARCH` |
+| `classifier.class_names` | `normal`, `cheating` | binary head |
+| `classifier.cheating_classes` | `cheating` | softmax column of that name |
+| `classifier.crop_pad` | `0` | Try-it uses the tight box (training crops used 0.10) |
+| `pipeline.process_fps` | `3` | `TRY_FPS` |
+| `pipeline.max_frame_width` | `0` (no downscale) | Try-it keeps the full frame |
+| `detector.conf` | `0.30` | `YOLO_CONF` |
+| `flagging.window_seconds` | `3` | rolling mean |
+| `flagging.min_duration_seconds` | `2` | flag after this long above the line |
+| `flagging.cooldown_seconds` | `20` | per student |
+| `flagging.threshold` | `0.5` | fallback only |
+
+When `flagging.use_checkpoint_threshold` is true (the default), a threshold saved in `best.pt` replaces the 0.5 fallback. That is the value Try-it uses. Set the flag to false to force the yaml value. Class names and the cheating index also come from the checkpoint when it has them, so an old 6-class list in yaml cannot point at the wrong column. The notebook head is 2-way cross-entropy: the score is a **softmax**, not a sigmoid. A single-logit file still uses a sigmoid.
+
+Preprocessing of each crop is BGR to RGB, divide by 255, resize to 224, ImageNet mean and std — the same as Try-it.
+
+## 5. Score chart
+The Live page draws one line per tracked student (smoothed cheating score), the threshold as a dashed line, and shaded bands for flagged periods. Points arrive on the WebSocket. A live session keeps the last `flagging.score_history_seconds` (180) on the server and in the browser. Opening a flag in **Review queue** shows that student's scores around the flag. For a recorded video, the full series is `GET /jobs/{id}/scores`.
+
+## 6. Recorded video and evaluation
 - Dashboard: **Live → Upload & analyse**. Or with the API: `POST /videos`.
 - Build a test video with known "cheating" times from a dataset folder that has class subfolders:
   ```
@@ -91,7 +113,7 @@ TorchScript files, whole saved models, checkpoint dicts, and binary (1- or 2-out
 
 ## API (http://localhost:8000/docs for the full list)
 `POST /auth/login` · `POST /videos` · `POST /streams` `{"url": "..."}` · `POST /streams/{id}/stop` ·
-`GET /jobs/{id}` · `GET /jobs/{id}/preview.mjpg` · `GET /flags?status=pending&limit=10` ·
+`GET /jobs/{id}` · `GET /jobs/{id}/preview.mjpg` · `GET /jobs/{id}/scores` · `GET /flags?status=pending&limit=10` ·
 `GET /flags/{id}` · `GET /flags/{id}/clip` · `GET /flags/{id}/thumbnail` · `POST /flags/{id}/review` `{"decision": "confirmed|dismissed", "note": ""}` ·
 `GET /stats` · `GET /audit` (admin) · `POST /admin/retention/run` (admin) · `WS /ws?token=...`
 

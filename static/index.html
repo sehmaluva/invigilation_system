@@ -6,6 +6,7 @@
   <title>Exam Invigilation Support</title>
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="data:,">
+  <script src="chart.umd.min.js"></script>
 </head>
 <body>
 <header>
@@ -69,6 +70,11 @@
       <h2>Incoming flags</h2>
       <ul id="liveFlags" class="flaglist"></ul>
     </div>
+  </div>
+  <div class="card">
+    <h2>Cheating score over time <span id="chartLabel" class="hint"></span></h2>
+    <div class="chart-wrap"><canvas id="scoreChart"></canvas></div>
+    <p id="chartHint" class="hint">Each line is one tracked student (smoothed score). The dashed line is the threshold. Shaded bands are periods flagged for review.</p>
   </div>
 </section>
 

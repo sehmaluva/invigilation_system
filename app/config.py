@@ -14,7 +14,8 @@ DATA_DIR = (ROOT / CFG["server"]["data_dir"]).resolve()
 CLIP_DIR = DATA_DIR / "clips"
 THUMB_DIR = DATA_DIR / "thumbs"
 UPLOAD_DIR = DATA_DIR / "uploads"
-for d in (DATA_DIR, CLIP_DIR, THUMB_DIR, UPLOAD_DIR):
+SERIES_DIR = DATA_DIR / "series"          # per-job cheating-score histories
+for d in (DATA_DIR, CLIP_DIR, THUMB_DIR, UPLOAD_DIR, SERIES_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
 

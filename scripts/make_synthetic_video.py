@@ -6,7 +6,8 @@ Image folder layout (same as examdatasetnew):
       normal/            *.jpg
       sidewatching/      *.jpg
       ...
-Classes listed in --cheat-classes (default: cheating_classes in config.yaml) are marked 1.
+Classes listed in --cheat-classes are marked 1. The default is the suspicious
+examdatasetnew folders (the binary notebook head is just called "cheating").
 A flat folder (no subfolders) also works: every 2nd segment is then marked as cheating
 (only useful to test the plumbing, not the model).
 
@@ -22,7 +23,6 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
@@ -39,7 +39,6 @@ def letterbox(img, w, h):
 
 
 def main():
-    cfg = yaml.safe_load(open(ROOT / "config.yaml"))
     ap = argparse.ArgumentParser()
     ap.add_argument("--images", required=True, help="folder of images (class subfolders)")
     ap.add_argument("--out", default="data/synthetic.mp4")
@@ -48,7 +47,10 @@ def main():
     ap.add_argument("--seconds", type=float, default=6, help="seconds each image is shown")
     ap.add_argument("--fps", type=int, default=10)
     ap.add_argument("--size", default="1280x720")
-    ap.add_argument("--cheat-classes", nargs="*", default=cfg["classifier"]["cheating_classes"])
+    # Ground truth is by folder name. The binary notebook head is just "cheating",
+    # which is not a folder in examdatasetnew, so keep the original suspicious folders.
+    ap.add_argument("--cheat-classes", nargs="*",
+                    default=["backwatching", "showinggestures", "sidewatching", "suspiciouswatching"])
     ap.add_argument("--seed", type=int, default=42)
     a = ap.parse_args()
     random.seed(a.seed)

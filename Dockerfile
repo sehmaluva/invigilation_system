@@ -12,4 +12,6 @@ COPY . .
 # sqlalchemy is missing, the build fails here instead of the container crashing.
 RUN python -c "import app.main"
 EXPOSE 8000
+# So the startup model/threshold log shows up immediately in `docker logs`.
+ENV PYTHONUNBUFFERED=1
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -12,12 +12,20 @@ except ImportError:
     imageio_ffmpeg = None
 
 
-def draw(frame, dets, highlight=None):
-    """Draw person boxes. dets: list of (track_id, bbox, smoothed_score)."""
+def draw(frame, dets, highlight=None, threshold=None, active=None):
+    """Draw person boxes. dets: list of (track_id, bbox, smoothed_score).
+
+    Red = flagged student, orange = smoothed score at or above the threshold
+    actually in use, green = below it.
+    """
+    thr = CFG["flagging"]["threshold"] if threshold is None else threshold
+    active = set(active or ())
+    if highlight is not None:
+        active.add(highlight)
     img = frame.copy()
     for tid, (x1, y1, x2, y2), s in dets:
-        hot = tid == highlight
-        color = (0, 0, 255) if hot else (0, 165, 255) if s >= CFG["flagging"]["threshold"] else (80, 200, 80)
+        hot = tid in active
+        color = (0, 0, 255) if hot else (0, 165, 255) if s >= thr else (80, 200, 80)
         cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), color, 3 if hot else 2)
         cv2.putText(img, f"ID {tid}  {s:.2f}", (int(x1), max(int(y1) - 6, 12)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
@@ -52,6 +60,7 @@ class ClipRecorder:
         self.post = CFG["clips"]["post_seconds"]
         self.buffer = deque()                             # (t, frame, dets)
         self.pending = []                                 # clips still collecting frames
+        self.threshold = None                             # set from the loaded checkpoint
 
     def add(self, t, frame, dets):
         self.buffer.append((t, frame, dets))
@@ -71,7 +80,7 @@ class ClipRecorder:
         frames = list(self.buffer)
         t, frame, dets = frames[-1]
         thumb = THUMB_DIR / f"flag_{flag_id}.jpg"
-        img = draw(frame, dets, highlight=track_id)
+        img = draw(frame, dets, highlight=track_id, threshold=self.threshold)
         scale = 480 / img.shape[1]
         cv2.imwrite(str(thumb), cv2.resize(img, None, fx=scale, fy=scale))
         self.pending.append({"flag_id": flag_id, "track_id": track_id, "t_flag": t_flag,
@@ -87,7 +96,8 @@ class ClipRecorder:
     def _save_async(self, clip):
         def work():
             path = CLIP_DIR / f"flag_{clip['flag_id']}.mp4"
-            frames = [draw(f, d, highlight=clip["track_id"]) for _, f, d in clip["frames"]]
+            frames = [draw(f, d, highlight=clip["track_id"], threshold=self.threshold)
+                      for _, f, d in clip["frames"]]
             try:
                 write_video(path, frames, self.fps)
                 clip["on_saved"](clip["flag_id"], str(path))

@@ -2,6 +2,7 @@
 import asyncio
 import json
 
+from .config import SERIES_DIR
 from .pipeline import Pipeline
 
 
@@ -30,6 +31,18 @@ class Manager:
     def is_alive(self, job_id):
         p = self.pipelines.get(job_id)
         return bool(p and p.is_alive())
+
+    def scores(self, job_id):
+        """In-memory series while the job is loaded, otherwise the file written at the end."""
+        p = self.pipelines.get(job_id)
+        if p is not None:
+            snap = p.score_snapshot()
+            if snap is not None:
+                return snap
+        path = SERIES_DIR / f"{job_id}.json"
+        if path.is_file():
+            return json.loads(path.read_text(encoding="utf-8"))
+        return None
 
     # called from pipeline threads -> hand over to the asyncio loop
     def notify(self, msg):

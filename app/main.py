@@ -1,5 +1,6 @@
 """FastAPI app: REST API + WebSocket + live preview + the dashboard (static/)."""
 import asyncio
+import json
 import shutil
 import time
 from datetime import datetime
@@ -13,7 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy import func
 
 from .auth import admin_user, check_password, current_user, ensure_default_admin, hash_password, make_token
-from .classifier import CLASS_NAMES, get_classifier_info
+from .classifier import get_classifier, get_classifier_info
 from .config import CFG, ROOT, UPLOAD_DIR
 from .db import AuditLog, Flag, Job, Review, SessionLocal, Source, User, audit, init_db, now
 from .manager import manager
@@ -33,6 +34,7 @@ async def startup():
             job.status, job.error = "stopped", "server restarted"
         db.commit()
     purge_old_media()
+    get_classifier()                                 # log model, classes, cheating index, threshold
 
 
 # ------------------------------------------------------------------ auth
@@ -184,7 +186,9 @@ def get_flag(flag_id: int, user: User = Depends(current_user)):
         reviews = [{"decision": r.decision, "note": r.note, "decided_at": r.decided_at.isoformat() + "Z",
                     "user": db.get(User, r.user_id).username}
                    for r in db.query(Review).filter_by(flag_id=flag_id)]
-        return {**flag_dict(f), "reviews": reviews}
+        thr = f.threshold if f.threshold is not None else get_classifier().threshold
+        return {**flag_dict(f), "reviews": reviews,
+                "threshold": thr, "score_series": _score_series(f.score_series)}
 
 
 def _media(path, kind):
@@ -273,11 +277,46 @@ def run_retention(days: int = None, admin: User = Depends(admin_user)):
     return {"deleted_files": len(deleted), "days": days if days is not None else CFG["retention"]["days"]}
 
 
+@app.get("/jobs/{job_id}/scores")
+def job_scores(job_id: int, user: User = Depends(current_user)):
+    """Full per-track cheating-score series for a recorded video, or the live window for a stream."""
+    with SessionLocal() as db:
+        job = db.get(Job, job_id)
+        if not job:
+            raise HTTPException(404, "Job not found")
+        kind = db.get(Source, job.source_id).kind
+    data = manager.scores(job_id)
+    if data is None:
+        info = get_classifier_info()
+        data = {"job_id": job_id, "kind": kind, "threshold": info["threshold"],
+                "bounded": kind == "stream",
+                "history_seconds": CFG["flagging"].get("score_history_seconds", 180),
+                "tracks": [], "flags": []}
+    return data
+
+
 @app.get("/config")
 def public_config(user: User = Depends(current_user)):
-    return {"classes": CLASS_NAMES, "cheating_classes": CFG["classifier"]["cheating_classes"],
-            "flagging": CFG["flagging"], "alert_cap": CFG["review"]["alert_cap"],
-            "process_fps": CFG["pipeline"]["process_fps"], "retention_days": CFG["retention"]["days"]}
+    info = get_classifier_info()
+    flagging = dict(CFG["flagging"])
+    flagging["threshold"] = info["threshold"]
+    return {"classes": info["class_names"], "cheating_classes": info["cheating_classes"],
+            "cheating_index": info["cheating_index"], "flagging": flagging,
+            "threshold": info["threshold"], "threshold_source": info["threshold_source"],
+            "activation": info["activation"], "arch": info["arch"],
+            "alert_cap": CFG["review"]["alert_cap"],
+            "process_fps": CFG["pipeline"]["process_fps"],
+            "score_history_seconds": CFG["flagging"].get("score_history_seconds", 180),
+            "retention_days": CFG["retention"]["days"]}
+
+
+def _score_series(raw):
+    if not raw:
+        return []
+    try:
+        return json.loads(raw)
+    except ValueError:
+        return []
 
 
 # ------------------------------------------------------------------ websocket
