@@ -1,6 +1,6 @@
-# AI-Assisted Exam Invigilation Support System (backend + dashboard)
+# AI-Assisted Exam Invigilation Support System
 
-CS/SWE 414 group project. This part covers the flag pipeline, clip export, the review dashboard, and logging of confirm/dismiss decisions.
+SWE 414 group project. This part covers the flag pipeline, clip export, the review dashboard, and logging of confirm/dismiss decisions.
 
 The system **flags moments for review**. It never accuses anyone; the invigilator watches the clip and decides.
 
