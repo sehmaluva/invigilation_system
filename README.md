@@ -17,28 +17,27 @@ Repository: [sehmaluva/invigilation_system](https://github.com/sehmaluva/invigil
 
 ## Table of contents
 
-- [AI-Assisted Exam Invigilation Support System](#ai-assisted-exam-invigilation-support-system)
-  - [Table of contents](#table-of-contents)
-  - [Course context](#course-context)
-  - [Team and roles](#team-and-roles)
-  - [Features](#features)
-  - [System architecture](#system-architecture)
-  - [Tech stack](#tech-stack)
-  - [Prerequisites](#prerequisites)
-  - [Installation and setup](#installation-and-setup)
-    - [Create a virtual environment and install dependencies](#create-a-virtual-environment-and-install-dependencies)
-    - [Set up the database and a user](#set-up-the-database-and-a-user)
-    - [Run the server and open the dashboard](#run-the-server-and-open-the-dashboard)
-  - [Configuration](#configuration)
-  - [How to add the trained model](#how-to-add-the-trained-model)
-  - [Usage](#usage)
-  - [API endpoints](#api-endpoints)
-  - [Evaluation](#evaluation)
-  - [Ethics and responsible use](#ethics-and-responsible-use)
-  - [Project structure](#project-structure)
-  - [Contributing](#contributing)
-  - [Licence / academic use](#licence--academic-use)
-  - [Known limitations](#known-limitations)
+- [Course context](#course-context)
+- [Team and roles](#team-and-roles)
+- [Features](#features)
+- [System architecture](#system-architecture)
+- [Tech stack](#tech-stack)
+- [Prerequisites](#prerequisites)
+- [Installation and setup](#installation-and-setup)
+  - [Create a virtual environment and install dependencies](#create-a-virtual-environment-and-install-dependencies)
+  - [Set up the database and a user](#set-up-the-database-and-a-user)
+  - [Run the server and open the dashboard](#run-the-server-and-open-the-dashboard)
+- [Configuration](#configuration)
+- [How to add the trained model](#how-to-add-the-trained-model)
+- [Usage](#usage)
+- [API endpoints](#api-endpoints)
+- [Evaluation](#evaluation)
+  - [Training data and model results](#training-data-and-model-results)
+- [Ethics and responsible use](#ethics--responsible-use)
+- [Project structure](#project-structure)
+- [Contributing](#contributing)
+- [Licence / academic use](#licence--academic-use)
+- [Known limitations](#known-limitations)
 
 ---
 
@@ -340,6 +339,46 @@ F1 is not printed by the script; it can be computed from the precision and recal
 
 The dashboard **Stats** page adds operational figures: pending / confirmed / dismissed counts, reviewed precision (`confirmed / reviewed`), average review time, and per-job processing fps and latency.
 
+### Training data and model results
+
+The production EfficientNet-B0 was fine-tuned in Google Colab on a TPU (PyTorch, bfloat16, seed 42) from ImageNet weights, with a two-class head and 224 px crops. Training used batch size 64, a frozen-backbone head stage (3 epochs, learning rate 1e-3) then full-network fine-tuning (up to 25 epochs, learning rate 1e-4, weight decay 1e-4, early-stopping patience 5 on validation macro-F1), and class-weighted cross-entropy. Person crops were taken with YOLOv8n (confidence 0.3, 10% pad, crop when the person covers less than 60% of the image, minimum crop 40 px). Files marked as flips or copies were dropped, and near-duplicates were linked by perceptual hash (Hamming distance ≤ 4). Validation was five-fold.
+
+**Datasets.** Training used two public still-image collections: `examdatasetnew` and the Kaggle Exam Cheating Dataset (`ardutraagiginting/exam-cheating-dataset`). After cleaning, the combined set had **3,658 images**: 2,175 cheating and 1,483 normal (2,096 from examdatasetnew, 1,562 from ExamCheatingDataset). The Hashemite student-cheating video dataset (`fairouzfarouq/student-cheating-behavior-dataset`) is listed in the notebook configuration but contributed no samples to this run. The OEP dataset is not used.
+
+The tables below are taken from `SmartInvigilation_runs/tpu_effnet/metrics.json` (out-of-fold predictions pooled across the five folds). Average precision (AP) is the area under the precision–recall curve (PR-AUC). AP does not depend on the operating threshold, so the same AP is shown at both thresholds for a given experiment. ROC-AUC was not computed; it can be obtained from `oof_predictions.csv`.
+
+**Per-fold results at the default threshold 0.5**
+
+| Fold | Best epoch | Precision | Recall | Macro-F1 | AP | n |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 6 | 0.866 | 0.826 | 0.819 | 0.920 | 627 |
+| 1 | 16 | 0.785 | 0.812 | 0.768 | 0.844 | 631 |
+| 2 | 16 | 0.860 | 0.897 | 0.828 | 0.943 | 783 |
+| 3 | 3 | 0.843 | 0.858 | 0.811 | 0.885 | 837 |
+| 4 | 12 | 0.834 | 0.848 | 0.803 | 0.905 | 780 |
+
+**Pooled cross-validation** (n = 3,658)
+
+| Setting | Precision | Recall | Cheating F1 | Macro-F1 | AP (PR-AUC) | Accuracy | Confusion (TN, FP, FN, TP) |
+|---|---:|---:|---:|---:|---:|---:|---|
+| Threshold 0.50 | 0.839 | 0.852 | — | 0.807 | 0.902 | 0.815 | 1,128 / 355 / 322 / 1,853 |
+| Deployed threshold 0.377 | 0.800 | 0.890 | 0.843 | 0.789 | 0.902 | 0.802 | 1,000 / 483 / 240 / 1,935 |
+
+The deployed threshold is **0.3768**, chosen on the out-of-fold predictions to hit a target precision of 0.80. Relative to the default threshold of 0.5, this raises recall from 0.852 to 0.890 while holding precision at the 0.80 target. The backend reads this threshold from `best.pt` or `metrics.json` when `flagging.use_checkpoint_threshold` is true. Cheating-class F1 at the default threshold 0.5 was not stored in `metrics.json` and is therefore not reported.
+
+**Cross-dataset tests** (train on one collection, test on the other)
+
+| Train → test | n | Threshold | Precision | Recall | Macro-F1 | AP |
+|---|---:|---:|---:|---:|---:|---:|
+| examdatasetnew → ExamCheatingDataset | 1,562 | 0.50 | 0.630 | 0.633 | 0.549 | 0.663 |
+| examdatasetnew → ExamCheatingDataset | 1,562 | 0.377 | 0.607 | 0.749 | 0.517 | 0.663 |
+| ExamCheatingDataset → examdatasetnew | 2,096 | 0.50 | 0.671 | 0.774 | 0.605 | 0.703 |
+| ExamCheatingDataset → examdatasetnew | 2,096 | 0.377 | 0.657 | 0.844 | 0.588 | 0.703 |
+
+Macro-F1 falls to about 0.55–0.61 when the camera setup changes. That limited transfer is why every flag is reviewed by an invigilator, and why more hall-specific video is the next data priority.
+
+These figures are **crop-level classifier scores**, not the event-level video metrics from `scripts/evaluate.py` (precision and recall at the alert cap, flags per hour, processing time). Those still come from a labelled hall video or the synthetic test video, as described above.
+
 **Explainability.** Grad-CAM heatmaps on flagged clips are planned as part of the evaluation and documentation work. They are **not in this repository yet**.
 
 Unit tests for checkpoint loading and the score-series path live in `tests/test_checkpoint_and_scores.py`. `pytest` is not listed in `requirements.txt`; install it separately if you want to run those tests.
@@ -452,5 +491,5 @@ It is not licensed for production invigilation, commercial use, or redistributio
 - Boxes older than `overlay_fresh_seconds` (1 s) are hidden rather than left sitting where the person used to be.
 - Camera angle and distance matter. The training and Try-it material is based on relatively close classroom shots; a wide hall will be harder.
 - Detection is intended to be CPU-friendly, but a larger hall with many people is slower. Torch is limited to two threads by default so the preview stays responsive.
-- Grad-CAM explainability and a formal per-frame confusion matrix are not produced by the current code.
+- Grad-CAM explainability is not produced by the current code. Crop-level confusion matrices from training are in `metrics.json` (see [Training data and model results](#training-data-and-model-results)); `scripts/evaluate.py` reports interval-overlap matches, not a per-frame confusion matrix.
 - Formal live deployment in a real examination is out of scope.

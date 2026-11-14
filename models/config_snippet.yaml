@@ -1,0 +1,7 @@
+classifier:
+  model_path: models/best.pt
+  arch: efficientnet_b0
+  input_size: 224
+  class_names: ["normal", "cheating"]
+  cheating_classes: ["cheating"]
+# flagging.threshold: start near 0.38 (precision ~0.8 on held-out folds), then tune on video

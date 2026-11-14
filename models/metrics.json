@@ -1,0 +1,302 @@
+{
+  "backend": "torch_tpu",
+  "cv_folds": [
+    {
+      "fold": 0,
+      "best_epoch": 6,
+      "threshold": 0.5,
+      "precision": 0.8657142857142858,
+      "recall": 0.8256130790190735,
+      "macro_f1": 0.8192421869521517,
+      "ap": 0.9196897731948124,
+      "confusion": [
+        [
+          213,
+          47
+        ],
+        [
+          64,
+          303
+        ]
+      ],
+      "n": 627
+    },
+    {
+      "fold": 1,
+      "best_epoch": 16,
+      "threshold": 0.5,
+      "precision": 0.7851239669421488,
+      "recall": 0.811965811965812,
+      "macro_f1": 0.7677728025516777,
+      "ap": 0.8440097796844497,
+      "confusion": [
+        [
+          202,
+          78
+        ],
+        [
+          66,
+          285
+        ]
+      ],
+      "n": 631
+    },
+    {
+      "fold": 2,
+      "best_epoch": 16,
+      "threshold": 0.5,
+      "precision": 0.8604651162790697,
+      "recall": 0.896969696969697,
+      "macro_f1": 0.8283583286550646,
+      "ap": 0.9434608460826931,
+      "confusion": [
+        [
+          216,
+          72
+        ],
+        [
+          51,
+          444
+        ]
+      ],
+      "n": 783
+    },
+    {
+      "fold": 3,
+      "best_epoch": 3,
+      "threshold": 0.5,
+      "precision": 0.8431372549019608,
+      "recall": 0.8582834331337326,
+      "macro_f1": 0.8114451441384589,
+      "ap": 0.8848618562275571,
+      "confusion": [
+        [
+          256,
+          80
+        ],
+        [
+          71,
+          430
+        ]
+      ],
+      "n": 837
+    },
+    {
+      "fold": 4,
+      "best_epoch": 12,
+      "threshold": 0.5,
+      "precision": 0.8336886993603412,
+      "recall": 0.8481561822125814,
+      "macro_f1": 0.8029697900665642,
+      "ap": 0.9047259333802486,
+      "confusion": [
+        [
+          241,
+          78
+        ],
+        [
+          70,
+          391
+        ]
+      ],
+      "n": 780
+    }
+  ],
+  "cv": {
+    "at_0_5": {
+      "threshold": 0.5,
+      "precision": 0.8392210144927537,
+      "recall": 0.8519540229885058,
+      "macro_f1": 0.8073589502384962,
+      "ap": 0.9021476934682249,
+      "confusion": [
+        [
+          1128,
+          355
+        ],
+        [
+          322,
+          1853
+        ]
+      ],
+      "n": 3658
+    },
+    "at_target": {
+      "threshold": 0.3767954409122467,
+      "precision": 0.8002481389578163,
+      "recall": 0.8896551724137931,
+      "macro_f1": 0.7885352848572278,
+      "ap": 0.9021476934682249,
+      "confusion": [
+        [
+          1000,
+          483
+        ],
+        [
+          240,
+          1935
+        ]
+      ],
+      "n": 3658
+    }
+  },
+  "cross_dataset": {
+    "examdatasetnew->ExamCheatingDataset": {
+      "at_0_5": {
+        "threshold": 0.5,
+        "precision": 0.6299892125134844,
+        "recall": 0.6334056399132321,
+        "macro_f1": 0.5487875799319187,
+        "ap": 0.6631296638502229,
+        "confusion": [
+          [
+            297,
+            343
+          ],
+          [
+            338,
+            584
+          ]
+        ],
+        "n": 1562
+      },
+      "at_cv_threshold": {
+        "threshold": 0.3767954409122467,
+        "precision": 0.6072056239015817,
+        "recall": 0.7494577006507592,
+        "macro_f1": 0.5168278706474925,
+        "ap": 0.6631296638502229,
+        "confusion": [
+          [
+            193,
+            447
+          ],
+          [
+            231,
+            691
+          ]
+        ],
+        "n": 1562
+      }
+    },
+    "ExamCheatingDataset->examdatasetnew": {
+      "at_0_5": {
+        "threshold": 0.5,
+        "precision": 0.6708160442600276,
+        "recall": 0.7741420590582602,
+        "macro_f1": 0.6052061652662406,
+        "ap": 0.7032428682818128,
+        "confusion": [
+          [
+            367,
+            476
+          ],
+          [
+            283,
+            970
+          ]
+        ],
+        "n": 2096
+      },
+      "at_cv_threshold": {
+        "threshold": 0.3767954409122467,
+        "precision": 0.6567349472377405,
+        "recall": 0.8443735035913806,
+        "macro_f1": 0.5877869017971327,
+        "ap": 0.7032428682818128,
+        "confusion": [
+          [
+            290,
+            553
+          ],
+          [
+            195,
+            1058
+          ]
+        ],
+        "n": 2096
+      }
+    }
+  },
+  "threshold": 0.3767954409122467,
+  "class_names": [
+    "normal",
+    "cheating"
+  ],
+  "cheating_classes": [
+    "cheating"
+  ],
+  "config": {
+    "SOURCE": "drive",
+    "DRIVE_ROOT": "/content/drive/MyDrive/SmartInvigilation",
+    "SOURCES": [
+      {
+        "name": "examdatasetnew",
+        "type": "images",
+        "path": "examdatasetnew/datasetnew"
+      },
+      {
+        "name": "ExamCheatingDataset",
+        "type": "images",
+        "path": "archive(1)/ExamCheatingDataset/train",
+        "kaggle": "ardutraagiginting/exam-cheating-dataset"
+      },
+      {
+        "name": "hashemite",
+        "type": "video",
+        "path": "hashemite",
+        "enabled": true,
+        "fps": 1.0,
+        "kaggle": "fairouzfarouq/student-cheating-behavior-dataset",
+        "label_map": {
+          "not cheating": 0,
+          "normal": 0,
+          "exchang": 1,
+          "looking": 1,
+          "sheet": 1,
+          "phone": 1,
+          "mobile": 1
+        }
+      }
+    ],
+    "OUT_DIR": "/content/drive/MyDrive/SmartInvigilation_runs/tpu_effnet",
+    "WORK_DIR": "/content/work",
+    "NORMAL_CLASSES": [
+      "normal",
+      "normal act",
+      "not cheating",
+      "notcheating"
+    ],
+    "FRONTWATCHING_IS_CHEATING": false,
+    "CROSS_PAIRS": [
+      [
+        "examdatasetnew",
+        "ExamCheatingDataset"
+      ]
+    ],
+    "ARCH": "efficientnet_b0",
+    "HEAD": "binary",
+    "IMG": 224,
+    "CACHE_SIZE": 256,
+    "BATCH": 64,
+    "EPOCHS_HEAD": 3,
+    "EPOCHS_FT": 25,
+    "LR_HEAD": 0.001,
+    "LR_FT": 0.0001,
+    "WD": 0.0001,
+    "PATIENCE": 5,
+    "LOSS": "weighted_ce",
+    "BF16": true,
+    "N_FOLDS": 5,
+    "FOLDS_TO_RUN": 5,
+    "TARGET_PRECISION": 0.8,
+    "DROP_FLIP_COPY_FILES": true,
+    "DEDUP_HAMMING": 4,
+    "YOLO_WEIGHTS": "yolov8n.pt",
+    "YOLO_CONF": 0.3,
+    "CROP_IF_PERSON_AREA_BELOW": 0.6,
+    "CROP_PAD": 0.1,
+    "MIN_CROP_PX": 40,
+    "SEED": 42
+  }
+}
