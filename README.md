@@ -45,11 +45,9 @@ Repository: [sehmaluva/invigilation_system](https://github.com/sehmaluva/invigil
 
 | | |
 |---|---|
-| **Module** | CS 414 / SWE 414 — *Artificial Intelligence and Intelligent Systems* |
+| **Module** SWE 414 - *Artificial Intelligence and Intelligent Systems* |
 | **Institution** | Bindura University of Science Education |
-| **Lecturer** | Mr C. Zano |
-| **Assessment** | Semester team project (M1–M5). The project must demonstrate problem analysis, justified AI techniques, data work, model design and evaluation, ethical and bias analysis, Git/GitHub documentation, and a live demonstration. |
-| **Course policy** | Any AI-assisted work must be declared. |
+
 
 This repository is the working system for that project: a flag pipeline, clip export, a review dashboard, and logging of confirm/dismiss decisions.
 
@@ -61,7 +59,6 @@ This repository is the working system for that project: a flag pipeline, clip ex
 |---|---|
 | **Nigel Kutadzaushe** ([Nijel20](https://github.com/Nijel20)) | Project lead, ML engineer, and final integration |
 | **Malvin T. Machingura** ([sehmaluva](https://github.com/sehmaluva)) | Backend, dashboard, and production-model training |
-| **Venon** | Evaluation metrics, Grad-CAM explainability, and documentation |
 
 The GitHub repository is owned by `sehmaluva`. At the time of writing, `Nijel20` has write access. Grad-CAM is part of the evaluation plan (Venon's responsibility) but is **not implemented in this repository yet**.
 
@@ -69,18 +66,18 @@ The GitHub repository is owned by `sehmaluva`. At the time of writing, `Nijel20`
 
 ## Features
 
-- **Recorded-video analysis** — upload an exam-hall video; a background worker samples frames and runs the detection/classification pipeline.
-- **Person detection and tracking** — YOLOv8n finds people; ByteTrack keeps a stable ID on each person for as long as they stay in view.
-- **Behaviour classification** — each person crop (224×224, ImageNet normalisation) is scored by an EfficientNet-B0 binary classifier with classes `normal` and `cheating`.
-- **Temporal flagging** — scores are smoothed with a rolling mean. A flag is opened only if the smoothed score stays above the threshold for a minimum duration, then a per-student cooldown applies.
-- **Review queue** — pending flags are ranked by peak confidence, capped by `review.alert_cap` (default 10). Each flag has a thumbnail, an H.264 clip (ring buffer: 8 s before, 3 s after), a hall zone on a 3×3 grid (A1–C3), and a score series around the event.
-- **Invigilator decisions** — confirm or dismiss a flag, optionally with a note. Decisions are stored and audited.
-- **Score chart** — the Live page (Chart.js) draws one line per tracked student (smoothed cheating score), the threshold as a dashed line, and shaded bands for flagged periods. For a recorded job the full series is available from `GET /jobs/{id}/scores`.
-- **Real-time preview** — uploaded files play at 1× by default. Display fps, inference fps, and latency are shown under the picture. Boxes are slid forward from the last detection and hidden after about one second.
-- **Live-camera demo** — optional path using IP Webcam / DroidCam or the laptop webcam. Useful for a demonstration; not the formal evaluation target.
-- **Authentication and audit** — login is required. Logins, reviews, clip views, and session starts are written to `audit_log`.
-- **Retention** — clips and thumbnails older than `retention.days` (default 14) are deleted at startup or on demand.
-- **Offline evaluation script** — compare a job's flags with a ground-truth CSV and report precision/recall at the alert cap, flags per hour, and processing time.
+- **Recorded-video analysis** - upload an exam-hall video; a background worker samples frames and runs the detection/classification pipeline.
+- **Person detection and tracking** - YOLOv8n finds people; ByteTrack keeps a stable ID on each person for as long as they stay in view.
+- **Behaviour classification** - each person crop (224×224, ImageNet normalisation) is scored by an EfficientNet-B0 binary classifier with classes `normal` and `cheating`.
+- **Temporal flagging** - scores are smoothed with a rolling mean. A flag is opened only if the smoothed score stays above the threshold for a minimum duration, then a per-student cooldown applies.
+- **Review queue** - pending flags are ranked by peak confidence, capped by `review.alert_cap` (default 10). Each flag has a thumbnail, an H.264 clip (ring buffer: 8 s before, 3 s after), a hall zone on a 3×3 grid (A1–C3), and a score series around the event.
+- **Invigilator decisions** - confirm or dismiss a flag, optionally with a note. Decisions are stored and audited.
+- **Score chart** - the Live page (Chart.js) draws one line per tracked student (smoothed cheating score), the threshold as a dashed line, and shaded bands for flagged periods. For a recorded job the full series is available from `GET /jobs/{id}/scores`.
+- **Real-time preview** - uploaded files play at 1× by default. Display fps, inference fps, and latency are shown under the picture. Boxes are slid forward from the last detection and hidden after about one second.
+- **Live-camera demo** - optional path using IP Webcam / DroidCam or the laptop webcam. Useful for a demonstration; not the formal evaluation target.
+- **Authentication and audit** - login is required. Logins, reviews, clip views, and session starts are written to `audit_log`.
+- **Retention** - clips and thumbnails older than `retention.days` (default 14) are deleted at startup or on demand.
+- **Offline evaluation script** - compare a job's flags with a ground-truth CSV and report precision/recall at the alert cap, flags per hour, and processing time.
 
 ---
 
@@ -239,7 +236,7 @@ Related defaults that match the notebook's Try-it path:
 
 **Threshold resolution.** When `flagging.use_checkpoint_threshold` is `true` (the default), the threshold is taken from, in order: the `threshold` field inside `best.pt`, then `models/metrics.json` or `models/threshold.json` beside the checkpoint, then the YAML fallback of `0.5`. Set `use_checkpoint_threshold: false` to force the YAML value. Class names, architecture, input size, and the cheating-class index also come from the checkpoint when it contains them, so a stale class list in YAML cannot point at the wrong column.
 
-The notebook head is 2-way cross-entropy: the cheating score is a **softmax** probability, not a sigmoid. A single-logit file still uses a sigmoid. Crop preprocessing is BGR→RGB, ÷255, resize to 224, ImageNet mean and std — the same as the notebook Try-it path.
+The notebook head is 2-way cross-entropy: the cheating score is a **softmax** probability, not a sigmoid. A single-logit file still uses a sigmoid. Crop preprocessing is BGR→RGB, ÷255, resize to 224, ImageNet mean and std - the same as the notebook Try-it path.
 
 ---
 
@@ -361,7 +358,7 @@ The tables below are taken from `SmartInvigilation_runs/tpu_effnet/metrics.json`
 
 | Setting | Precision | Recall | Cheating F1 | Macro-F1 | AP (PR-AUC) | Accuracy | Confusion (TN, FP, FN, TP) |
 |---|---:|---:|---:|---:|---:|---:|---|
-| Threshold 0.50 | 0.839 | 0.852 | — | 0.807 | 0.902 | 0.815 | 1,128 / 355 / 322 / 1,853 |
+| Threshold 0.50 | 0.839 | 0.852 | - | 0.807 | 0.902 | 0.815 | 1,128 / 355 / 322 / 1,853 |
 | Deployed threshold 0.377 | 0.800 | 0.890 | 0.843 | 0.789 | 0.902 | 0.802 | 1,000 / 483 / 240 / 1,935 |
 
 The deployed threshold is **0.3768**, chosen on the out-of-fold predictions to hit a target precision of 0.80. Relative to the default threshold of 0.5, this raises recall from 0.852 to 0.890 while holding precision at the 0.80 target. The backend reads this threshold from `best.pt` or `metrics.json` when `flagging.use_checkpoint_threshold` is true. Cheating-class F1 at the default threshold 0.5 was not stored in `metrics.json` and is therefore not reported.
@@ -395,7 +392,7 @@ This system is a **decision-support tool**. It flags moments for review. It does
 | Auditability | Login, failed login, review, clip view, and session start are written to `audit_log`. Admin users can read the log at `GET /audit`. |
 | Data retention | Clips and thumbnails older than `retention.days` (14 by default) are deleted at startup, via `POST /admin/retention/run`, or `python scripts/cleanup_clips.py`. |
 | Access control | The dashboard and API require a login. Roles are `admin` and `invigilator`. Change the default admin password before any shared use. |
-| Candidate privacy | Only film people who have agreed to it — for example a staged mock exam with classmates. A real exam needs permission from the department. Do not publish raw hall footage or clips. |
+| Candidate privacy | Only film people who have agreed to it - for example a staged mock exam with classmates. A real exam needs permission from the department. Do not publish raw hall footage or clips. |
 | Fairness and bias | Camera angle, distance, lighting, clothing, and seating position all affect detection and classification. Results from close-up classroom datasets may not transfer to a large hall. Treat error rates as part of the evaluation write-up, not as proof of guilt. |
 | Scope | Formal live deployment in a production exam is out of scope for this course project. |
 
