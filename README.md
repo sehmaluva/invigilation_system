@@ -482,7 +482,6 @@ It is not licensed for production invigilation, commercial use, or redistributio
 
 ## Known limitations
 
-- Until a trained `best.pt` is loaded, scores come from the **STUB** and must not be interpreted as cheating evidence.
 - Clips are recorded at the processing rate (default 3 fps), so they look choppy even when the live preview plays at the camera or file rate.
 - If a student leaves the frame and comes back, ByteTrack may assign a new ID.
 - Boxes older than `overlay_fresh_seconds` (1 s) are hidden rather than left sitting where the person used to be.
