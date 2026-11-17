@@ -37,7 +37,7 @@ Repository: [sehmaluva/invigilation_system](https://github.com/sehmaluva/invigil
 
 ---
 
-## Team and roles
+## Group Members
 
 | Name | Reg Number |
 |---|---|
