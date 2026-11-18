@@ -1,5 +1,0 @@
-Copy Nigel's trained model here as:  models/best.pt
-Accepted formats: TorchScript, a whole saved model (torch.save(model)), or a checkpoint
-dict / state_dict for resnet50 or efficientnet_b0 (set classifier.arch in config.yaml).
-Make sure classifier.class_names in config.yaml is in the same order as training.
-Until best.pt exists the system runs a STUB model (scores are not real).

@@ -23,7 +23,7 @@ pipeline:
   preview_max_fps: 30            # cap on how often the preview is re-encoded
   realtime: true                 # files play at 1x. false = analyse sampled frames as fast as possible
   overlay_fresh_seconds: 1.0    # hide boxes that are older than this on the live picture
-  torch_threads: 2               # keep CPU inference from starving the preview
+  torch_threads: 6               # keep CPU inference from starving the preview
   min_crop_px: 40                # ignore tiny person boxes
 
 classifier:                      # notebook best.pt plugs in here
@@ -57,7 +57,7 @@ clips:
   post_seconds: 3                # seconds recorded after the flag
 
 review:
-  alert_cap: 10                  # max pending flags shown at once (highest score first)
+  alert_cap: 100                # max pending flags shown at once (highest score first)
 
 retention:
   days: 14                       # clips/thumbnails older than this are deleted
