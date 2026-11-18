@@ -17,10 +17,8 @@ Repository: [sehmaluva/invigilation_system](https://github.com/sehmaluva/invigil
 
 ## Table of contents
 
-- [Course context](#course-context)
-- [Team and roles](#team-and-roles)
+- [Group Members](#group-members)
 - [Features](#features)
-- [System architecture](#system-architecture)
 - [Tech stack](#tech-stack)
 - [Prerequisites](#prerequisites)
 - [Installation and setup](#installation-and-setup)
@@ -33,34 +31,21 @@ Repository: [sehmaluva/invigilation_system](https://github.com/sehmaluva/invigil
 - [API endpoints](#api-endpoints)
 - [Evaluation](#evaluation)
   - [Training data and model results](#training-data-and-model-results)
-- [Ethics and responsible use](#ethics--responsible-use)
 - [Project structure](#project-structure)
 - [Contributing](#contributing)
-- [Licence / academic use](#licence--academic-use)
 - [Known limitations](#known-limitations)
 
 ---
 
-## Course context
+## Group Members
 
-| | |
+| Name | Reg Number |
 |---|---|
-| **Module** SWE 414 - *Artificial Intelligence and Intelligent Systems* |
-| **Institution** | Bindura University of Science Education |
+| **Nigel Kutadzaushe** ([Nijel20](https://github.com/Nijel20)) | B226444A |
+| **Malvin T. Machingura** ([sehmaluva](https://github.com/sehmaluva)) | B226941A |
+| **Tatenda Chingosho** | B221912B |
+| **Venon T. Nyadombo**  | B226715A |
 
-
-This repository is the working system for that project: a flag pipeline, clip export, a review dashboard, and logging of confirm/dismiss decisions.
-
----
-
-## Team and roles
-
-| Name | Role |
-|---|---|
-| **Nigel Kutadzaushe** ([Nijel20](https://github.com/Nijel20)) | Project lead, ML engineer, and final integration |
-| **Malvin T. Machingura** ([sehmaluva](https://github.com/sehmaluva)) | Backend, dashboard, and production-model training |
-
-The GitHub repository is owned by `sehmaluva`. At the time of writing, `Nijel20` has write access. Grad-CAM is part of the evaluation plan (Venon's responsibility) but is **not implemented in this repository yet**.
 
 ---
 
@@ -81,28 +66,6 @@ The GitHub repository is owned by `sehmaluva`. At the time of writing, `Nijel20`
 
 ---
 
-## System architecture
-
-The main deliverable path is offline: a recorded video is uploaded, queued, and processed; flags are stored and reviewed on the dashboard.
-
-```mermaid
-flowchart TD
-    A[Upload recorded exam video] --> B[Job queue]
-    B --> C[Worker samples frames at ~3 fps]
-    C --> D[YOLOv8n person detection<br/>+ ByteTrack IDs]
-    D --> E[Crop each person<br/>224×224, ImageNet norm]
-    E --> F[EfficientNet-B0 classifier<br/>classes: normal, cheating]
-    F --> G[Rolling-mean smoothing<br/>~3 s window per track]
-    G --> H[Flag if above threshold<br/>for min duration + cooldown]
-    H --> I[Save flag, thumbnail,<br/>and clip from ring buffer]
-    I --> J[(SQLite: jobs, flags,<br/>reviews, audit_log)]
-    J --> K[FastAPI]
-    K --> L[Dashboard review queue<br/>confirm or dismiss]
-```
-
-A live stream follows the same pipeline after capture. Decoding and the MJPEG preview run on the newest frame so a slow detector does not build up delay. Inference stays at about `pipeline.process_fps` (default 3) and drops stale frames.
-
----
 
 ## Tech stack
 
@@ -118,7 +81,7 @@ A live stream follows the same pipeline after capture. Decoding and the MJPEG pr
 | Config | `config.yaml` (PyYAML) |
 | Training | Colab notebook `models/Exam_Cheating_TPU_Training.ipynb` (EfficientNet-B0, emits `best.pt` and `metrics.json`) |
 
-There is no `pyproject.toml`; Python dependencies are listed in `requirements.txt`.
+Python dependencies are listed in `requirements.txt`.
 
 ---
 
@@ -216,27 +179,6 @@ flagging:
   min_duration_seconds: 2        # score must stay above threshold this long
   cooldown_seconds: 20           # no new flag for the same student during this time
 ```
-
-Related defaults that match the notebook's Try-it path:
-
-| Setting | Default | Meaning |
-|---|---|---|
-| `pipeline.process_fps` | `3` | Frames analysed per second |
-| `pipeline.max_frame_width` | `0` | No downscale on inference (full frame) |
-| `pipeline.realtime` | `true` | Uploaded files play at 1× unless overridden |
-| `pipeline.overlay_fresh_seconds` | `1.0` | Hide stale live boxes after this many seconds |
-| `pipeline.torch_threads` | `2` | Limit Torch threads so the preview is not starved |
-| `detector.weights` | `yolov8n.pt` | Downloaded automatically on first run |
-| `detector.conf` | `0.30` | YOLO confidence |
-| `detector.tracker` | `bytetrack.yaml` | Person tracker |
-| `clips.pre_seconds` / `post_seconds` | `8` / `3` | Clip length around a flag |
-| `review.alert_cap` | `10` | Max pending flags shown at once (highest score first) |
-| `retention.days` | `14` | Age after which clips and thumbnails are deleted |
-| `flagging.score_history_seconds` | `180` | Live-chart history kept per track |
-
-**Threshold resolution.** When `flagging.use_checkpoint_threshold` is `true` (the default), the threshold is taken from, in order: the `threshold` field inside `best.pt`, then `models/metrics.json` or `models/threshold.json` beside the checkpoint, then the YAML fallback of `0.5`. Set `use_checkpoint_threshold: false` to force the YAML value. Class names, architecture, input size, and the cheating-class index also come from the checkpoint when it contains them, so a stale class list in YAML cannot point at the wrong column.
-
-The notebook head is 2-way cross-entropy: the cheating score is a **softmax** probability, not a sigmoid. A single-logit file still uses a sigmoid. Crop preprocessing is BGR→RGB, ÷255, resize to 224, ImageNet mean and std - the same as the notebook Try-it path.
 
 ---
 
@@ -382,22 +324,6 @@ Unit tests for checkpoint loading and the score-series path live in `tests/test_
 
 ---
 
-## Ethics and responsible use
-
-This system is a **decision-support tool**. It flags moments for review. It does not determine that a candidate cheated. Track IDs are not identities.
-
-| Principle | How the system supports it |
-|---|---|
-| Human in the loop | An invigilator must watch the clip and confirm or dismiss every flag. Wording in the UI is always "flagged for review". |
-| Auditability | Login, failed login, review, clip view, and session start are written to `audit_log`. Admin users can read the log at `GET /audit`. |
-| Data retention | Clips and thumbnails older than `retention.days` (14 by default) are deleted at startup, via `POST /admin/retention/run`, or `python scripts/cleanup_clips.py`. |
-| Access control | The dashboard and API require a login. Roles are `admin` and `invigilator`. Change the default admin password before any shared use. |
-| Candidate privacy | Only film people who have agreed to it - for example a staged mock exam with classmates. A real exam needs permission from the department. Do not publish raw hall footage or clips. |
-| Fairness and bias | Camera angle, distance, lighting, clothing, and seating position all affect detection and classification. Results from close-up classroom datasets may not transfer to a large hall. Treat error rates as part of the evaluation write-up, not as proof of guilt. |
-| Scope | Formal live deployment in a production exam is out of scope for this course project. |
-
----
-
 ## Project structure
 
 Verified from the repository tree on `main`:
@@ -449,43 +375,3 @@ invigilation_system/
 `data/` is created at runtime and is gitignored. It holds `invigilation.db`, uploads, clips, and thumbnails.
 
 ---
-
-## Contributing
-
-This is a private course-project repository. Work on a feature branch, open a pull request against `main`, and wait for review before merging. Keep commits focused and write messages that say what changed and why.
-
-Suggested workflow:
-
-```bash
-git checkout main
-git pull
-git checkout -b feature/short-description
-# ... work, then:
-git add -p
-git commit -m "Describe the change"
-git push -u origin feature/short-description
-```
-
-Do not commit secrets, raw exam footage, or large unrelated binaries. `.gitignore` already excludes `.venv/`, `data/`, `__pycache__/`, `*.pt`, `*.mp4`, and `*.zip`. If a teammate needs the trained weights, share `best.pt` out of band or confirm it is already in `models/` before assuming it was pushed.
-
-**Course policy: any AI-assisted work must be declared** in the technical report, the presentation, and in pull requests or commit messages where it is practical to do so. That includes code, documentation, and evaluation write-ups produced with assistance.
-
----
-
-## Licence / academic use
-
-This repository has no licence file and is a private academic project for CS 414 / SWE 414 at Bindura University of Science Education. It is intended for coursework, demonstration, and examination by the teaching team.
-
-It is not licensed for production invigilation, commercial use, or redistribution of models, videos, or student footage. Third-party components (PyTorch, Ultralytics YOLOv8, FastAPI, Chart.js, and others) remain under their own licences.
-
----
-
-## Known limitations
-
-- Clips are recorded at the processing rate (default 3 fps), so they look choppy even when the live preview plays at the camera or file rate.
-- If a student leaves the frame and comes back, ByteTrack may assign a new ID.
-- Boxes older than `overlay_fresh_seconds` (1 s) are hidden rather than left sitting where the person used to be.
-- Camera angle and distance matter. The training and Try-it material is based on relatively close classroom shots; a wide hall will be harder.
-- Detection is intended to be CPU-friendly, but a larger hall with many people is slower. Torch is limited to two threads by default so the preview stays responsive.
-- Grad-CAM explainability is not produced by the current code. Crop-level confusion matrices from training are in `metrics.json` (see [Training data and model results](#training-data-and-model-results)); `scripts/evaluate.py` reports interval-overlap matches, not a per-frame confusion matrix.
-- Formal live deployment in a real examination is out of scope.
